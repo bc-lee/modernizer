@@ -379,8 +379,12 @@ int RunModernizer(const RunModernizerOptions& options) {
   }
 
   ReplacementsContext replacements_context;
-  // TODO(bc-lee): Apply AllTUsToolExecutor
-  StandaloneToolExecutor executor(*compilation_database.get(), source_paths);
+  std::unique_ptr<ToolExecutor> executor;
+  if (options.num_jobs > 1) {
+    executor = std::make_unique<AllTUsToolExecutor>(*compilation_database.get(), options.num_jobs);
+  } else {
+    executor = std::make_unique<StandaloneToolExecutor>(*compilation_database.get(), source_paths);
+  }
 
   ArgumentsAdjuster arguments_adjuster =
       combineAdjusters(getClangStripDependencyFileAdjuster(),
@@ -395,7 +399,7 @@ int RunModernizer(const RunModernizerOptions& options) {
           .bind("decl"),
       &callback);
 
-  llvm::Error error = executor.execute(newFrontendActionFactory(&finder));
+  llvm::Error error = executor->execute(newFrontendActionFactory(&finder));
   if (error) {
     llvm::errs() << "Execute error: " << toString(std::move(error)) << "\n";
     return 1;
