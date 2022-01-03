@@ -8,6 +8,7 @@
 #include "clang/Edit/EditedSource.h"
 #include "clang/Edit/EditsReceiver.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Rewrite/Core/Rewriter.h"
 #include "clang/Tooling/AllTUsExecution.h"
 #include "clang/Tooling/JSONCompilationDatabase.h"
@@ -322,24 +323,6 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
   ReplacementsContext* replacements_context_;
 };
 
-class NullDiagnosticConsumer : public DiagnosticConsumer {
- public:
-  ~NullDiagnosticConsumer() override = default;
-
-  bool IncludeInDiagnosticCounts() const override { return false; }
-  void HandleDiagnostic(DiagnosticsEngine::Level diag_level,
-                        const Diagnostic& info) override {
-    if (diag_level >= DiagnosticsEngine::Error) {
-      num_hidden_errors_++;
-    }
-  }
-
-  int GetNumHiddenErrors() const { return num_hidden_errors_; }
-
- private:
-  int num_hidden_errors_ = 0;
-};
-
 }  // namespace
 
 int RunModernizer(const RunModernizerOptions& options) {
@@ -399,9 +382,6 @@ int RunModernizer(const RunModernizerOptions& options) {
   // TODO(bc-lee): Apply AllTUsToolExecutor
   StandaloneToolExecutor executor(*compilation_database.get(), source_paths);
 
-  NullDiagnosticConsumer null_diagnostic_consumer;
-  executor.setDiagnosticConsumer(&null_diagnostic_consumer);
-
   ArgumentsAdjuster arguments_adjuster =
       combineAdjusters(getClangStripDependencyFileAdjuster(),
                        combineAdjusters(getClangSyntaxOnlyAdjuster(),
@@ -416,8 +396,6 @@ int RunModernizer(const RunModernizerOptions& options) {
       &callback);
 
   llvm::Error error = executor.execute(newFrontendActionFactory(&finder));
-  llvm::errs() << "Number of errors in diagnostic: "
-               << null_diagnostic_consumer.GetNumHiddenErrors() << "\n";
   if (error) {
     llvm::errs() << "Execute error: " << toString(std::move(error)) << "\n";
     return 1;
@@ -426,10 +404,11 @@ int RunModernizer(const RunModernizerOptions& options) {
   // boilerplate
   LangOptions default_lang_options;
   llvm::IntrusiveRefCntPtr<DiagnosticOptions> diag_opts =
-      new DiagnosticOptions();
+      llvm::makeIntrusiveRefCnt<DiagnosticOptions>();
+  TextDiagnosticPrinter diagnostic_printer(llvm::errs(), &*diag_opts);
   DiagnosticsEngine diagnostics(
       IntrusiveRefCntPtr<DiagnosticIDs>(new DiagnosticIDs()), &*diag_opts,
-      &null_diagnostic_consumer, false);
+      &diagnostic_printer, false);
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> file_system(
       llvm::vfs::createPhysicalFileSystem().release());
   file_system->setCurrentWorkingDirectory(build_root.string());

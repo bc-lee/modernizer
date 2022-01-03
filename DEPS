@@ -8,3 +8,11 @@ deps = {
   'src/third_party/re2':
     'https://github.com/google/re2@d826d9fcb68c62996c1b7c0a45d604e22d814952',
 }
+
+hooks = [
+  {
+    'name': 'clang',
+    'pattern': '.',
+    'action': ['python3', 'src/tools/clang/scripts/update.py'],
+  },
+]

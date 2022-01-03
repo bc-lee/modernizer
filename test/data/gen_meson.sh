@@ -1,12 +1,17 @@
 #!/bin/bash
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 set -x
 set -e
 
 case "$OSTYPE" in
   darwin*)
-    CXX=$(xcrun --sdk macosx --find clang++)
-    CXXFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.11.0"
+    CXX="$SCRIPT_DIR/../../third_party/llvm-build/Release+Asserts/bin/clang++"
+    CXXFLAGS="-nostdinc++ -isysroot $(xcrun --sdk macosx --show-sdk-path) \
+     -mmacosx-version-min=10.11.0 \
+     -isystem$SCRIPT_DIR/../../third_party/llvm-build/Release+Asserts/include/c++/v1 \
+     -isystem$SCRIPT_DIR/../../third_party/llvm-build/Release+Asserts/lib/clang/14.0.0/include"
     ;;
   linux*)
     CXX=clang++
