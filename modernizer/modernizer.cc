@@ -323,6 +323,62 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
   ReplacementsContext* replacements_context_;
 };
 
+class StoredCompilationDatabase : public CompilationDatabase {
+ public:
+  ~StoredCompilationDatabase() override = default;
+
+  std::vector<CompileCommand> getCompileCommands(
+      llvm::StringRef file_path) const override {
+    std::vector<CompileCommand> result;
+    auto iter = impl_.lower_bound(file_path.str());
+    const auto iter_end = impl_.upper_bound(file_path.str());
+    for (; iter != impl_.end() && iter != iter_end; ++iter) {
+      result.emplace_back(iter->second.directory, iter->first,
+                          iter->second.command_line, iter->second.output);
+    }
+    return result;
+  }
+  std::vector<std::string> getAllFiles() const override {
+    std::vector<std::string> result;
+    for (const auto& iter : impl_) {
+      result.push_back(iter.first);
+    }
+    return result;
+  }
+  std::vector<CompileCommand> getAllCompileCommands() const override {
+    std::vector<CompileCommand> result;
+    for (const auto& iter : impl_) {
+      result.emplace_back(iter.second.directory, iter.first,
+                          iter.second.command_line, iter.second.output);
+    }
+    return result;
+  }
+
+  void Add(std::string&& file_name,
+           std::string&& directory,
+           std::vector<std::string>&& command_line,
+           std::string&& output);
+
+ private:
+  struct CompilationData {
+    std::string directory;
+    std::vector<std::string> command_line;
+    std::string output;
+  };
+
+  std::multimap<std::string, CompilationData> impl_;
+};
+
+void StoredCompilationDatabase::Add(std::string&& file_name,
+                                    std::string&& directory,
+                                    std::vector<std::string>&& command_line,
+                                    std::string&& output) {
+  impl_.insert(
+      std::make_pair(file_name, CompilationData{.directory = directory,
+                                                .command_line = command_line,
+                                                .output = output}));
+}
+
 }  // namespace
 
 int RunModernizer(const RunModernizerOptions& options) {
@@ -342,48 +398,57 @@ int RunModernizer(const RunModernizerOptions& options) {
     return 1;
   }
 
-  std::string error_message;
-  auto compilation_database = JSONCompilationDatabase::loadFromFile(
-      compile_commands.string(), error_message, JSONCommandLineSyntax::Gnu);
-  if (!compilation_database) {
-    llvm::errs() << "Parsing compile_commands.json failed: " << error_message
-                 << "\n";
-    return 1;
-  }
-
+  StoredCompilationDatabase stored_compilation_database;
   std::filesystem::path build_root;
   std::vector<std::string> source_paths;
-  for (const auto& compile_command :
-       compilation_database->getAllCompileCommands()) {
-    if (build_root.empty()) {
-      build_root = compile_command.Directory;
-    } else if (build_root != compile_command.Directory) {
-      llvm::errs() << "Multiple directory not supported: first: "
-                   << build_root.string()
-                   << ", second: " << compile_command.Directory << "\n";
+  {
+    std::string error_message;
+    auto compilation_database = JSONCompilationDatabase::loadFromFile(
+        compile_commands.string(), error_message, JSONCommandLineSyntax::Gnu);
+    if (!compilation_database) {
+      llvm::errs() << "Parsing compile_commands.json failed: " << error_message
+                   << "\n";
       return 1;
     }
-    std::filesystem::path file_path(compile_command.Filename);
-    if (file_path.is_relative()) {
-      auto file_path_result = Canonical(std::filesystem::path(
-          compile_command.Directory /
-          std::filesystem::path(compile_command.Filename)));
-      if (!file_path_result) {
-        llvm::errs() << "filesystem::canonical returned error: "
-                     << file_path_result.takeError() << "\n";
+    for (auto compile_command : compilation_database->getAllCompileCommands()) {
+      if (build_root.empty()) {
+        build_root = compile_command.Directory;
+      } else if (build_root != compile_command.Directory) {
+        llvm::errs() << "Multiple directory not supported: first: "
+                     << build_root.string()
+                     << ", second: " << compile_command.Directory << "\n";
         return 1;
       }
-      file_path = *file_path_result;
+      std::filesystem::path file_path(compile_command.Filename);
+      if (file_path.is_relative()) {
+        auto new_file_path = std::filesystem::path(
+            compile_command.Directory /
+            std::filesystem::path(compile_command.Filename));
+        auto file_path_result = Canonical(new_file_path);
+        if (!file_path_result) {
+          llvm::errs() << "filesystem::canonical for " << new_file_path
+                       << " returned error: "
+                       << llvm::toString(file_path_result.takeError()) << "\n";
+          continue;
+        }
+        file_path = *file_path_result;
+      }
+      source_paths.push_back(file_path.string());
+      stored_compilation_database.Add(file_path.string(),
+                                      std::move(compile_command.Directory),
+                                      std::move(compile_command.CommandLine),
+                                      std::move(compile_command.Output));
     }
-    source_paths.push_back(file_path.string());
   }
 
   ReplacementsContext replacements_context;
   std::unique_ptr<ToolExecutor> executor;
   if (options.num_jobs > 1) {
-    executor = std::make_unique<AllTUsToolExecutor>(*compilation_database.get(), options.num_jobs);
+    executor = std::make_unique<AllTUsToolExecutor>(stored_compilation_database,
+                                                    options.num_jobs);
   } else {
-    executor = std::make_unique<StandaloneToolExecutor>(*compilation_database.get(), source_paths);
+    executor = std::make_unique<StandaloneToolExecutor>(
+        stored_compilation_database, source_paths);
   }
 
   ArgumentsAdjuster arguments_adjuster =
