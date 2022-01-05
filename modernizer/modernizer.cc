@@ -401,6 +401,12 @@ int RunModernizer(const RunModernizerOptions& options) {
                  << ec.message() << "\n";
     return 1;
   }
+  if (!std::filesystem::exists(compile_commands, ec)) {
+    llvm::errs() << "compile_commands.json does not exist: " << ec.message()
+                 << "\n";
+    return 1;
+  }
+
   if (!in_place && !out_stream) {
     llvm::errs() << "Output stream is not set.\n";
     return 1;
