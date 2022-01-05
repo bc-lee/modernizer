@@ -459,10 +459,11 @@ int RunModernizer(const RunModernizerOptions& options) {
         stored_compilation_database, source_paths);
   }
 
-  ArgumentsAdjuster arguments_adjuster =
-      combineAdjusters(getClangStripDependencyFileAdjuster(),
-                       combineAdjusters(getClangSyntaxOnlyAdjuster(),
-                                        getClangStripOutputAdjuster()));
+  ArgumentsAdjuster arguments_adjuster = combineAdjusters(
+      getClangStripDependencyFileAdjuster(),
+      combineAdjusters(getClangSyntaxOnlyAdjuster(),
+                       combineAdjusters(getStripPluginsAdjuster(),
+                                        getClangStripOutputAdjuster())));
 
   MatchFinder finder;
   ModernizerCallback callback(project_root, build_root, &replacements_context);
@@ -472,7 +473,8 @@ int RunModernizer(const RunModernizerOptions& options) {
           .bind("decl"),
       &callback);
 
-  llvm::Error error = executor->execute(newFrontendActionFactory(&finder));
+  llvm::Error error =
+      executor->execute(newFrontendActionFactory(&finder), arguments_adjuster);
   if (error) {
     llvm::errs() << "Execute error: " << toString(std::move(error)) << "\n";
     return 1;
