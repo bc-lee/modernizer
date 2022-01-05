@@ -382,7 +382,15 @@ void StoredCompilationDatabase::Add(std::string&& file_name,
 }  // namespace
 
 int RunModernizer(const RunModernizerOptions& options) {
-  const auto& project_root = options.project_root;
+  auto project_root_or_error = Canonical(options.project_root);
+  if (!project_root_or_error) {
+    llvm::errs() << "Invalid project root: " << options.project_root
+                 << " error: "
+                 << llvm::toString(project_root_or_error.takeError()) << "\n";
+    return 1;
+  }
+
+  const auto& project_root = *project_root_or_error;
   const auto& compile_commands = options.compile_commands;
   bool in_place = options.in_place;
   llvm::raw_ostream* out_stream = options.out_stream;
