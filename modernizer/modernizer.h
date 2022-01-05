@@ -13,6 +13,7 @@ inline constexpr const char* kModernizeMacro = "RTC_DISALLOW_COPY_AND_ASSIGN";
 struct RunModernizerOptions {
   std::filesystem::path project_root;
   std::filesystem::path compile_commands;
+  std::string source_file_pattern;
   int num_jobs = std::thread::hardware_concurrency();
   bool in_place = false;
   llvm::raw_ostream* out_stream = nullptr;

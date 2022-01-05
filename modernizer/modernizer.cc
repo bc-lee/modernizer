@@ -18,6 +18,7 @@
 #include "modernizer/diff.h"
 #include "modernizer/filesystem.h"
 #include "modernizer/mutex_lock.h"
+#include "modernizer/path_pattern.h"
 #include "modernizer/refactoring.h"
 #include "re2/re2.h"
 
@@ -407,6 +408,16 @@ int RunModernizer(const RunModernizerOptions& options) {
     return 1;
   }
 
+  std::optional<PathPattern> source_file_pattern;
+  if (!options.source_file_pattern.empty()) {
+    source_file_pattern = PathPattern::Create(options.source_file_pattern);
+    if (!source_file_pattern) {
+      llvm::errs() << "Bad source file pattern: " << options.source_file_pattern
+                   << "\n";
+      return 1;
+    }
+  }
+
   if (!in_place && !out_stream) {
     llvm::errs() << "Output stream is not set.\n";
     return 1;
@@ -446,6 +457,22 @@ int RunModernizer(const RunModernizerOptions& options) {
           continue;
         }
         file_path = *file_path_result;
+      }
+      if (source_file_pattern) {
+        auto relative_file_path = Relative(file_path, project_root);
+        if (!relative_file_path) {
+          llvm::errs() << "filesystem::relative for " << file_path
+                       << " returned error: "
+                       << llvm::toString(relative_file_path.takeError())
+                       << "\n";
+          continue;
+        }
+        if (!source_file_pattern->Match(relative_file_path->string())) {
+          llvm::errs()
+              << " Skip " << file_path
+              << " because it does not match the source file pattern\n";
+          continue;
+        }
       }
       source_paths.push_back(file_path.string());
       stored_compilation_database.Add(file_path.string(),

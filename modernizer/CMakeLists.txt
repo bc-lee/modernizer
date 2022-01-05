@@ -9,9 +9,11 @@ add_library(lib_modernizer OBJECT
     diff.h
     filesystem.cc
     filesystem.h
-    mutex_lock.h
     modernizer.cc
     modernizer.h
+    mutex_lock.h
+    path_pattern.cc
+    path_pattern.h
     refactoring.cc
     refactoring.h
 )
@@ -36,6 +38,7 @@ target_link_libraries(test_main
 
 add_executable(modernizer_test
     modernizer_unittest.cc
+    path_pattern_unittest.cc
 )
 
 target_compile_definitions(modernizer_test
