@@ -19,7 +19,6 @@
 #include "modernizer/filesystem.h"
 #include "modernizer/mutex_lock.h"
 #include "modernizer/path_pattern.h"
-#include "modernizer/refactoring.h"
 #include "re2/re2.h"
 
 using namespace clang;
@@ -32,20 +31,30 @@ namespace {
 constexpr std::string_view kModernizeMacroRegex =
     "(RTC_DISALLOW_COPY_AND_ASSIGN\\(\\s*(\\S(|.*\\S))\\s*\\);)";
 
+struct SimpleSourceLocation {
+  int line;
+  int column;
+
+  constexpr bool operator<(const SimpleSourceLocation& other) const {
+    return std::tie(line, column) < std::tie(other.line, other.column);
+  }
+};
+
 class LOCKABLE ReplacementsContext {
  public:
   void lock() EXCLUSIVE_LOCK_FUNCTION() { mutex_.Lock(); }
 
   void unlock() UNLOCK_FUNCTION() { mutex_.Unlock(); }
 
-  std::map<std::string, Replacements>& GetReplacements()
-      EXCLUSIVE_LOCKS_REQUIRED(this) {
+  std::map<std::string, std::map<SimpleSourceLocation, Replacements>>&
+  GetReplacements() EXCLUSIVE_LOCKS_REQUIRED(this) {
     return impl_;
   }
 
  private:
   mutable absl::Mutex mutex_;
-  std::map<std::string, Replacements> impl_ GUARDED_BY(mutex_);
+  std::map<std::string, std::map<SimpleSourceLocation, Replacements>> impl_
+      GUARDED_BY(mutex_);
 };
 
 class ClassMemberFunctionVisitor
@@ -130,6 +139,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
         result.Nodes.getNodeAs<CXXConstructorDecl>("decl");
     assert(decl);
     if (!decl->getBeginLoc().isValid()) {
+      assert(false);
       return;
     }
     FullSourceLoc source_loc(sm.getExpansionLoc(decl->getLocation()), sm);
@@ -183,13 +193,17 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       return;
     }
 
-    std::vector<AtomicChange> changes;
+    std::map<SimpleSourceLocation, Replacements> loc_replacements;
     {
       AtomicChange change(sm, macro_source_range.getBegin());
       llvm::Error result =
           change.replace(sm, CharSourceRange(macro_source_range, true), "");
       assert(!result);
-      changes.push_back(std::move(change));
+      std::optional<SimpleSourceLocation> simple_source_loc =
+          GetSimpleSourceLocation(
+              FullSourceLoc(macro_source_range.getBegin(), sm));
+      assert(simple_source_loc);
+      loc_replacements[*simple_source_loc] = change.getReplacements();
     }
     {
       SourceLocation insert_offset_loc = insertable_loc->getLocWithOffset(1);
@@ -203,22 +217,25 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       llvm::Error result =
           change.insert(sm, insert_offset_loc, deleted_decl_stream.str(), true);
       assert(!result);
-      changes.push_back(std::move(change));
+      std::optional<SimpleSourceLocation> simple_source_loc =
+          GetSimpleSourceLocation(FullSourceLoc(insert_offset_loc, sm));
+      assert(simple_source_loc);
+      loc_replacements[*simple_source_loc] = change.getReplacements();
     }
 
     std::string rel_file_path_str = rel_file_path->string();
     MutexLock guard(*replacements_context_);
-    std::map<std::string, Replacements>& replacements =
-        replacements_context_->GetReplacements();
-    for (const auto& change : changes) {
-      auto iter = replacements.find(rel_file_path_str);
-      if (iter == replacements.end()) {
-        replacements.insert(
-            std::make_pair(rel_file_path_str, change.getReplacements()));
-      } else {
-        Replacements merged = iter->second.merge(change.getReplacements());
-        replacements[rel_file_path_str] = merged;
-      }
+    auto& replacements = replacements_context_->GetReplacements();
+    auto replacements_iter = replacements.find(rel_file_path_str);
+    if (replacements_iter == replacements.end()) {
+      auto result2 = replacements.insert(
+          std::remove_reference<decltype(replacements)>::type::value_type(
+              rel_file_path_str, {}));
+      assert(result2.second);
+      replacements_iter = result2.first;
+    }
+    for (const auto& loc_replacement : loc_replacements) {
+      replacements_iter->second.insert(loc_replacement);
     }
   }
 
@@ -317,6 +334,21 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
         return loc;
       }
     }
+  }
+
+  static std::optional<SimpleSourceLocation> GetSimpleSourceLocation(
+      const FullSourceLoc& source_loc) {
+    SimpleSourceLocation simple_source_loc;
+    bool invalid = false;
+    simple_source_loc.line = source_loc.getLineNumber(&invalid);
+    if (invalid) {
+      return std::nullopt;
+    }
+    simple_source_loc.column = source_loc.getColumnNumber(&invalid);
+    if (invalid) {
+      return std::nullopt;
+    }
+    return simple_source_loc;
   }
 
   const std::filesystem::path root_path_;
@@ -530,13 +562,54 @@ int RunModernizer(const RunModernizerOptions& options) {
   SourceManager sm(diagnostics, *files);
   Rewriter rewrite(sm, default_lang_options);
   {
+    FileManager& file_manager = sm.getFileManager();
     MutexLock guard(replacements_context);
-    if (!FormatAndApplyAllReplacements(replacements_context.GetReplacements(),
-                                       rewrite)) {
-      llvm::errs() << "Apply Replacements failed\n";
-      return 1;
+    const std::map<std::string, std::map<SimpleSourceLocation, Replacements>>&
+        replacements = replacements_context.GetReplacements();
+
+    for (const auto& file_replacements : replacements) {
+      const std::string& file_path = file_replacements.first;
+      const FileEntry* entry = nullptr;
+      if (auto file = file_manager.getFile(file_path)) {
+        entry = *file;
+      } else {
+        llvm::errs() << "getFile failed for " << file_path
+                     << " with error: " << file.getError().message() << "\n";
+        continue;
+      }
+
+      FileID id = sm.getOrCreateFileID(entry, SrcMgr::C_User);
+      llvm::StringRef buffer = sm.getBufferData(id);
+
+      auto style = format::getStyle("file", file_path, "LLVM", "",
+                                    &file_manager.getVirtualFileSystem());
+      if (!style) {
+        llvm::errs() << llvm::toString(style.takeError()) << "\n";
+        continue;
+      }
+
+      Replacements merged_replacements;
+      for (auto iter = file_replacements.second.rbegin();
+           iter != file_replacements.second.rend(); ++iter) {
+        auto formatted_replacements =
+            format::formatReplacements(buffer, iter->second, *style);
+        if (!formatted_replacements) {
+          llvm::errs() << llvm::toString(formatted_replacements.takeError())
+                       << "\n";
+          continue;
+        }
+        merged_replacements =
+            merged_replacements.merge(*formatted_replacements);
+      }
+
+      if (!merged_replacements.empty() &&
+          !applyAllReplacements(merged_replacements, rewrite)) {
+        llvm::errs() << "Apply Replacements failed\n";
+        return 1;
+      }
     }
   }
+
   if (in_place) {
     if (!rewrite.overwriteChangedFiles()) {
       llvm::errs() << "write to file failed\n";

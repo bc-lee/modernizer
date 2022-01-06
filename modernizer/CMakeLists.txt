@@ -14,8 +14,6 @@ add_library(lib_modernizer OBJECT
     mutex_lock.h
     path_pattern.cc
     path_pattern.h
-    refactoring.cc
-    refactoring.h
 )
 
 target_link_libraries(lib_modernizer

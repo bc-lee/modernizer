@@ -20,4 +20,16 @@ std::string Foo::foo() {
   return foo_;
 }
 
+class Barrrrrrrrr {
+ public:
+  Barrrrrrrrr();
+  ~Barrrrrrrrr();
+
+  int barrr() { return bar++; }
+
+  int bar = 0;
+
+ private:
+  RTC_DISALLOW_COPY_AND_ASSIGN(Barrrrrrrrr);
+};
 }  // namespace
