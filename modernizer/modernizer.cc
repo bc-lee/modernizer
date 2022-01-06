@@ -611,7 +611,11 @@ int RunModernizer(const RunModernizerOptions& options) {
   }
 
   if (in_place) {
-    if (!rewrite.overwriteChangedFiles()) {
+    // TODO(bc-lee): Remove chdir
+    errno = 0;
+    chdir(build_root.c_str());
+    assert(errno == 0);
+    if (rewrite.overwriteChangedFiles()) {
       llvm::errs() << "write to file failed\n";
       return 1;
     }
