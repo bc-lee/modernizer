@@ -33,7 +33,5 @@ class Barrrrrrrrr {
   int barrr() { return bar++; }
 
   int bar = 0;
-
- private:
 };
 }  // namespace

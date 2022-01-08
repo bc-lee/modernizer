@@ -1,5 +1,6 @@
 #include "modernizer/modernizer.h"
 
+#include "absl/algorithm/container.h"
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 #include "clang/AST/RecursiveASTVisitor.h"
@@ -167,25 +168,19 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     visitor.Visit();
     const auto& inner_decls = visitor.GetInnerDecls();
 
-    CXXMethodDecl* next_decl = nullptr;
-    for (int i = 0; i < static_cast<int>(inner_decls.size()); ++i) {
-      if (inner_decls[i] == decl && i < static_cast<int>(inner_decls.size())) {
-        const Decl* inner_next_decl = inner_decls[i + 1];
-        if (llvm::isa<CXXMethodDecl>(inner_next_decl)) {
-          next_decl = static_cast<CXXMethodDecl*>(inner_decls[i + 1]);
-          break;
-        }
-      }
-    }
-    if (next_decl == nullptr) {
-      return;
-    }
+    std::optional<SourceLocation> remove_decl_source_location =
+        CheckIfRemovablePrivateDeclLocation(class_access_specifier, decl,
+                                            inner_decls, sm, lang_opts);
     std::optional<std::pair<SourceRange, std::string>> macro_source_range_name =
         FindMacro(decl, kModernizeMacroRegex, sm, lang_opts);
     if (!macro_source_range_name) {
       return;
     }
     auto [macro_source_range, class_name] = macro_source_range_name.value();
+    if (remove_decl_source_location && remove_decl_source_location->isValid()) {
+      macro_source_range = SourceRange(*remove_decl_source_location,
+                                       macro_source_range.getEnd());
+    }
 
     std::optional<SourceLocation> insertable_loc = FindInsertableLocation(
         class_access_specifier, inner_decls, sm, lang_opts);
@@ -278,6 +273,52 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     return std::nullopt;
   }
 
+  static std::optional<SourceLocation> CheckIfRemovablePrivateDeclLocation(
+      AccessSpecifier class_access_specifier,
+      const CXXConstructorDecl* macro_ctor_decl,
+      const std::vector<Decl*>& all_decls,
+      const SourceManager& sm,
+      const LangOptions& lang_opts) {
+    AccessSpecifier as = class_access_specifier;
+    AccessSpecDecl* candidate_decl = nullptr;
+    bool maybe_remove = false;
+    for (auto iter = all_decls.begin(); iter != all_decls.end(); ++iter) {
+      Decl* decl = *iter;
+      if (llvm::isa<AccessSpecDecl>(decl)) {
+        auto access_decl = static_cast<AccessSpecDecl*>(decl);
+        as = access_decl->getAccess();
+        assert(as != clang::AS_none);
+        if (maybe_remove && as != clang::AS_private) {
+          candidate_decl = nullptr;
+          maybe_remove = false;
+          break;
+        } else if (!maybe_remove && as == clang::AS_private) {
+          candidate_decl = access_decl;
+          maybe_remove = true;
+        }
+        continue;
+      }
+      if (decl == macro_ctor_decl) {
+        if (as != clang::AS_private) {
+          return std::nullopt;
+        }
+        maybe_remove = true;
+        ++iter;
+        assert(llvm::isa<CXXMethodDecl>(*iter));
+        continue;
+      }
+      if (maybe_remove) {
+        candidate_decl = nullptr;
+        maybe_remove = false;
+        break;
+      }
+    }
+    if (maybe_remove) {
+      return candidate_decl->getLocation();
+    }
+    return std::nullopt;
+  }
+
   static std::optional<SourceLocation> FindInsertableLocation(
       AccessSpecifier class_access_specifier,
       const std::vector<Decl*>& all_decls,
@@ -309,12 +350,6 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       return std::nullopt;
     }
 
-#if 0
-    auto simple_source_loc = GetSimpleSourceLocation(FullSourceLoc(candidate_loc, sm));
-    assert(simple_source_loc);
-    llvm::errs() << "candidate line: " << simple_source_loc->line << ", column: " << simple_source_loc->column << "\n";
-#endif
-
     std::optional<SourceLocation> next_semi_loc =
         MaybeFindNextSemi(candidate_loc, sm, lang_opts);
     if (!next_semi_loc) {
@@ -324,11 +359,6 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     if (candidate_loc_fileid != sm.getFileID(*next_semi_loc)) {
       return candidate_loc;
     }
-#if 0
-    simple_source_loc = GetSimpleSourceLocation(FullSourceLoc(*next_semi_loc, sm));
-    assert(simple_source_loc);
-    llvm::errs() << "candidate semi line: " << simple_source_loc->line << ", column: " << simple_source_loc->column << "\n";
-#endif
     return next_semi_loc;
   }
 
