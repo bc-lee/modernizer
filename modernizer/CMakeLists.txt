@@ -35,12 +35,7 @@ target_link_libraries(test_main
 )
 
 add_executable(modernizer_test
-    modernizer_unittest.cc
     path_pattern_unittest.cc
-)
-
-target_compile_definitions(modernizer_test
-    PRIVATE -DTESTDATA_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/../test/data"
 )
 
 target_link_libraries(modernizer_test

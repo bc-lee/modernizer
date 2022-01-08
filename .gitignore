@@ -12,6 +12,16 @@ CTestTestfile.cmake
 _deps
 /cmake-*
 
+### Python ###
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+
 ### Linux ###
 *~
 

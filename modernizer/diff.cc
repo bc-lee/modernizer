@@ -9,8 +9,11 @@ namespace {
 
 std::vector<std::string> CreateLinedBuffer(std::string_view view) {
   // TODO(bc-lee): Handle case with trailing newline character.
-  std::vector<std::string> result = absl::StrSplit(view, "\n");
-  return result;
+  std::vector<std::string> lines = absl::StrSplit(view, "\n");
+  if (!lines.empty() && lines.back().empty()) {
+    lines.pop_back();
+  }
+  return lines;
 }
 
 }  // namespace
