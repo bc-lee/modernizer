@@ -303,37 +303,48 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       return std::nullopt;
     }
 
-    SourceLocation candidate_loc = candidate_decl->getLocation();
+    SourceLocation candidate_loc = candidate_decl->getEndLoc();
     FileID candidate_loc_fileid = sm.getFileID(candidate_loc);
     if (candidate_loc_fileid.isInvalid()) {
       return std::nullopt;
     }
+
+#if 0
+    auto simple_source_loc = GetSimpleSourceLocation(FullSourceLoc(candidate_loc, sm));
+    assert(simple_source_loc);
+    llvm::errs() << "candidate line: " << simple_source_loc->line << ", column: " << simple_source_loc->column << "\n";
+#endif
+
     std::optional<SourceLocation> next_semi_loc =
-        FindNextSemi(candidate_loc, sm, lang_opts);
+        MaybeFindNextSemi(candidate_loc, sm, lang_opts);
     if (!next_semi_loc) {
-      return std::nullopt;
+      return candidate_loc;
     }
 
     if (candidate_loc_fileid != sm.getFileID(*next_semi_loc)) {
-      return std::nullopt;
+      return candidate_loc;
     }
+#if 0
+    simple_source_loc = GetSimpleSourceLocation(FullSourceLoc(*next_semi_loc, sm));
+    assert(simple_source_loc);
+    llvm::errs() << "candidate semi line: " << simple_source_loc->line << ", column: " << simple_source_loc->column << "\n";
+#endif
     return next_semi_loc;
   }
 
-  static std::optional<SourceLocation> FindNextSemi(
+  static std::optional<SourceLocation> MaybeFindNextSemi(
       SourceLocation loc,
       const SourceManager& sm,
       const LangOptions& lang_opts) {
-    while (true) {
-      llvm::Optional<Token> token = Lexer::findNextToken(loc, sm, lang_opts);
-      if (!token) {
-        return std::nullopt;
-      }
-      loc = token->getLocation();
-      if (token->getKind() == clang::tok::semi) {
-        return loc;
-      }
+    llvm::Optional<Token> token = Lexer::findNextToken(loc, sm, lang_opts);
+    if (!token) {
+      return std::nullopt;
     }
+    if (token->getKind() != clang::tok::semi) {
+      return std::nullopt;
+    }
+
+    return token->getLocation();
   }
 
   static std::optional<SimpleSourceLocation> GetSimpleSourceLocation(

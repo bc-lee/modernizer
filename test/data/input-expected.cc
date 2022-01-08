@@ -25,7 +25,7 @@ std::string Foo::foo() {
 class Barrrrrrrrr {
  public:
   Barrrrrrrrr();
-  ~Barrrrrrrrr();
+  ~Barrrrrrrrr() { bar = 0; }
 
   Barrrrrrrrr(const Barrrrrrrrr&) = delete;
   Barrrrrrrrr& operator=(const Barrrrrrrrr&) = delete;

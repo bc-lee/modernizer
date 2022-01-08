@@ -23,7 +23,7 @@ std::string Foo::foo() {
 class Barrrrrrrrr {
  public:
   Barrrrrrrrr();
-  ~Barrrrrrrrr();
+  ~Barrrrrrrrr() { bar = 0; }
 
   int barrr() { return bar++; }
 
