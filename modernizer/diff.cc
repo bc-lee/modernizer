@@ -26,7 +26,7 @@ bool CreateDiff(std::string_view file_name,
   std::vector<std::string> after_lines = CreateLinedBuffer(after);
 
   std::string result = ::testing::internal::edit_distance::CreateUnifiedDiff(
-      before_lines, after_lines, 3);
+      before_lines, after_lines, 4);
   stream << "--- a/" << file_name << "\n+++ b/" << file_name << "\n";
   stream << result;
   return true;

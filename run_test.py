@@ -66,6 +66,9 @@ def main(argv):
           f"Command '{shlex.join(cmd)}' returned non-zero exit status {retcode}."
           f" stdout:\n{stdout}\nstderr:\n{stderr}")
 
+    print(f"stout:\n{stdout}")
+    print(f"stderr:\n{stderr}")
+
     for test_file in TEST_FILES:
       expected_name, ext = os.path.splitext(test_file)
       expected = TEST_ROOT.joinpath(expected_name + "-expected" + ext)
