@@ -158,6 +158,13 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
                    << rel_file_path.takeError() << "\n";
       return;
     }
+
+    auto simple_source_loc = GetSimpleSourceLocation(source_loc);
+    assert(simple_source_loc);
+    llvm::errs() << "candidate <file:" << *rel_file_path
+                 << ",line:" << simple_source_loc->line
+                 << ",column: " << simple_source_loc->column << ">\n";
+
     const CXXRecordDecl* class_decl = decl->getParent();
     assert(class_decl);
     AccessSpecifier class_access_specifier =
@@ -202,6 +209,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     }
     {
       SourceLocation insert_offset_loc = insertable_loc->getLocWithOffset(1);
+      assert(insert_offset_loc.isValid());
       AtomicChange change(sm, insert_offset_loc);
       std::string deleted_decl;
       llvm::raw_string_ostream deleted_decl_stream(deleted_decl);
@@ -245,7 +253,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     SourceLocation source_location_begin =
         sm.getExpansionLoc(decl->getLocation());
     SourceLocation source_location_end = source_location_begin;
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < 10; ++i) {
       SourceRange source_range(source_location_begin, source_location_end);
       if (source_range.isInvalid()) {
         return std::nullopt;
@@ -325,7 +333,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       const SourceManager& sm,
       const LangOptions& lang_opts) {
     AccessSpecifier as = class_access_specifier;
-    Decl* candidate_decl = nullptr;
+    CXXDestructorDecl* candidate_decl = nullptr;
     for (Decl* decl : all_decls) {
       if (llvm::isa<AccessSpecDecl>(decl)) {
         as = static_cast<AccessSpecDecl*>(decl)->getAccess();
@@ -334,7 +342,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       }
       if (llvm::isa<CXXDestructorDecl>(decl)) {
         if (as == clang::AS_public && !decl->isImplicit()) {
-          candidate_decl = decl;
+          candidate_decl = static_cast<CXXDestructorDecl*>(decl);
           break;
         }
       }
@@ -345,36 +353,33 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     }
 
     SourceLocation candidate_loc = candidate_decl->getEndLoc();
-    FileID candidate_loc_fileid = sm.getFileID(candidate_loc);
-    if (candidate_loc_fileid.isInvalid()) {
-      return std::nullopt;
+    // PrintSourceLocation(candidate_loc, sm, "candidate_loc");
+    if (candidate_decl->doesThisDeclarationHaveABody()) {
+      return candidate_loc;
     }
 
     std::optional<SourceLocation> next_semi_loc =
-        MaybeFindNextSemi(candidate_loc, sm, lang_opts);
-    if (!next_semi_loc) {
-      return candidate_loc;
-    }
-
-    if (candidate_loc_fileid != sm.getFileID(*next_semi_loc)) {
-      return candidate_loc;
-    }
+        FindNextSemi(candidate_loc, sm, lang_opts);
+    // PrintSourceLocation(*next_semi_loc, sm, "next_semi_loc");
     return next_semi_loc;
   }
 
-  static std::optional<SourceLocation> MaybeFindNextSemi(
+  static std::optional<SourceLocation> FindNextSemi(
       SourceLocation loc,
       const SourceManager& sm,
       const LangOptions& lang_opts) {
-    llvm::Optional<Token> token = Lexer::findNextToken(loc, sm, lang_opts);
-    if (!token) {
-      return std::nullopt;
+    // PrintSourceLocation(loc, sm);
+    while (true) {
+      llvm::Optional<Token> token = Lexer::findNextToken(loc, sm, lang_opts);
+      if (!token) {
+        return std::nullopt;
+      }
+      loc = token->getLocation();
+      // PrintSourceLocation(loc, sm);
+      if (token->getKind() == clang::tok::semi) {
+        return loc;
+      }
     }
-    if (token->getKind() != clang::tok::semi) {
-      return std::nullopt;
-    }
-
-    return token->getLocation();
   }
 
   static std::optional<SimpleSourceLocation> GetSimpleSourceLocation(
@@ -391,6 +396,53 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     }
     return simple_source_loc;
   }
+
+#if 0
+  static void PrintSourceLocation(const SourceLocation& loc,
+                                  const SourceManager& sm,
+                                  std::string_view prefix = "") {
+    if (!loc.isValid()) {
+      llvm::errs() << "Invalid Source Loc\n";
+      return;
+    }
+    SourceLocation spelling_loc = sm.getSpellingLoc(loc);
+    SourceLocation expansion_loc = sm.getExpansionLoc(loc);
+
+    std::string result;
+    llvm::raw_string_ostream result_stream(result);
+
+    if (!prefix.empty()) {
+      result_stream << prefix << " ";
+    }
+    result_stream << "spelling: ";
+    WriteBareSourceLocation(result_stream, spelling_loc, sm, true);
+    result_stream << " expansion: ";
+    WriteBareSourceLocation(result_stream, expansion_loc, sm, false);
+    result_stream << "\n";
+    result_stream.flush();
+    llvm::errs() << result;
+  }
+
+  static llvm::raw_ostream& WriteBareSourceLocation(llvm::raw_ostream& ostream,
+                                                    SourceLocation loc,
+                                                    const SourceManager& sm,
+                                                    bool is_spelling) {
+    PresumedLoc presumed = sm.getPresumedLoc(loc);
+    unsigned actual_line = is_spelling ? sm.getSpellingLineNumber(loc)
+                                       : sm.getExpansionLineNumber(loc);
+    StringRef actual_file = sm.getBufferName(loc);
+    if (!presumed.isValid()) {
+      ostream << "<>";
+      return ostream;
+    }
+
+    ostream << "<file:" << (actual_file.empty() ? "unknown" : actual_file)
+            << ",";
+    ostream << "line:" << actual_line << ",";
+    ostream << "col:" << presumed.getColumn() << ">";
+    return ostream;
+  }
+#endif
 
   const std::filesystem::path root_path_;
   const std::filesystem::path build_path_;

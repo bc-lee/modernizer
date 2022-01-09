@@ -23,7 +23,7 @@ import subprocess2
 TEST_ROOT = ROOT / "test" / "data"
 COMPILE_COMMANDS_JSON = TEST_ROOT / "build" / "compile_commands.json"
 
-TEST_FILES = ["input.cc"]
+TEST_FILES = ["input.cc", "mutex_lock.h"]
 
 
 def main(argv):

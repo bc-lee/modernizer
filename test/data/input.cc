@@ -1,5 +1,6 @@
 #include <string>
 
+#include "mutex_lock.h"
 #include "rtc_base/constructor_magic.h"
 
 namespace {
