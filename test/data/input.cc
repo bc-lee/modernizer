@@ -3,6 +3,7 @@
 #include "byte_buffer.h"
 #include "mutex_lock.h"
 #include "osinfo.h"
+#include "ref_counted_base.h"
 #include "rtc_base/constructor_magic.h"
 
 namespace {
@@ -10,7 +11,7 @@ namespace {
 class Foo {
  public:
   Foo();
-  ~Foo();
+  ~Foo() = default;
 
   std::string foo();
 

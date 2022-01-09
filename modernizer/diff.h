@@ -7,7 +7,7 @@
 
 namespace modernizer {
 
-bool CreateDiff(std::string_view file_name,
+void CreateDiff(std::string_view file_name,
                 std::string_view left,
                 std::string_view right,
                 llvm::raw_ostream& stream);

@@ -35,6 +35,7 @@ target_link_libraries(test_main
 )
 
 add_executable(modernizer_test
+    diff_unittest.cc
     path_pattern_unittest.cc
 )
 
