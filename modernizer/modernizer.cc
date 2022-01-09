@@ -199,7 +199,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     {
       AtomicChange change(sm, macro_source_range.getBegin());
       llvm::Error result =
-          change.replace(sm, CharSourceRange(macro_source_range, true), "");
+          change.replace(sm, CharSourceRange(macro_source_range, false), "");
       assert(!result);
       std::optional<SimpleSourceLocation> simple_source_loc =
           GetSimpleSourceLocation(
@@ -269,7 +269,10 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       re2::StringPiece match0;
       re2::StringPiece match1;
       if (re2::RE2::FullMatch(source_text, regex, &match0, &match1)) {
-        return std::make_pair(source_range, match1.as_string());
+        return std::make_pair(
+            SourceRange(source_location_begin,
+                        source_location_end.getLocWithOffset(1)),
+            match1.as_string());
       }
       llvm::Optional<Token> tok =
           Lexer::findNextToken(source_location_end, sm, lang_opts);
@@ -684,19 +687,19 @@ int RunModernizer(const RunModernizerOptions& options) {
       Replacements merged_replacements;
       for (auto iter = file_replacements.second.rbegin();
            iter != file_replacements.second.rend(); ++iter) {
-        auto formatted_replacements =
-            format::formatReplacements(buffer, iter->second, *style);
-        if (!formatted_replacements) {
-          llvm::errs() << llvm::toString(formatted_replacements.takeError())
-                       << "\n";
-          continue;
-        }
-        merged_replacements =
-            merged_replacements.merge(*formatted_replacements);
+        merged_replacements = merged_replacements.merge(iter->second);
       }
 
-      if (!merged_replacements.empty() &&
-          !applyAllReplacements(merged_replacements, rewrite)) {
+      auto formatted_replacements =
+          format::formatReplacements(buffer, merged_replacements, *style);
+      if (!formatted_replacements) {
+        llvm::errs() << llvm::toString(formatted_replacements.takeError())
+                     << "\n";
+        continue;
+      }
+
+      if (formatted_replacements &&
+          !applyAllReplacements(*formatted_replacements, rewrite)) {
         llvm::errs() << "Apply Replacements failed\n";
         return 1;
       }
