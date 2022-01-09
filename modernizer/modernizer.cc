@@ -163,7 +163,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     assert(simple_source_loc);
     llvm::errs() << "candidate <file:" << *rel_file_path
                  << ",line:" << simple_source_loc->line
-                 << ",column: " << simple_source_loc->column << ">\n";
+                 << ",column:" << simple_source_loc->column << ">\n";
 
     const CXXRecordDecl* class_decl = decl->getParent();
     assert(class_decl);
@@ -391,7 +391,16 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
 
     SourceLocation candidate_loc = candidate_decl->getEndLoc();
     // PrintSourceLocation(candidate_loc, sm, "candidate_loc");
-    if (candidate_decl->doesThisDeclarationHaveABody()) {
+    bool need_next_semi;
+    if (candidate_decl->isDefaulted()) {
+      need_next_semi = true;
+    } else if (candidate_decl->isInlined()) {
+      need_next_semi = false;
+    } else {
+      need_next_semi = true;
+    }
+
+    if (!need_next_semi) {
       return candidate_loc;
     }
 
