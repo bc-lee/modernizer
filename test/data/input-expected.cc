@@ -1,6 +1,8 @@
 #include <string>
 
+#include "byte_buffer.h"
 #include "mutex_lock.h"
+#include "osinfo.h"
 #include "rtc_base/constructor_magic.h"
 
 namespace {

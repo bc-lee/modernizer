@@ -336,7 +336,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       const SourceManager& sm,
       const LangOptions& lang_opts) {
     AccessSpecifier as = class_access_specifier;
-    CXXDestructorDecl* candidate_decl = nullptr;
+    CXXMethodDecl* candidate_decl = nullptr;
     for (Decl* decl : all_decls) {
       if (llvm::isa<AccessSpecDecl>(decl)) {
         as = static_cast<AccessSpecDecl*>(decl)->getAccess();
@@ -344,9 +344,26 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
         continue;
       }
       if (llvm::isa<CXXDestructorDecl>(decl)) {
-        if (as == clang::AS_public && !decl->isImplicit()) {
+        if (!decl->isImplicit()) {
           candidate_decl = static_cast<CXXDestructorDecl*>(decl);
           break;
+        }
+      }
+    }
+
+    if (candidate_decl == nullptr) {
+      as = class_access_specifier;
+      for (Decl* decl : all_decls) {
+        if (llvm::isa<AccessSpecDecl>(decl)) {
+          as = static_cast<AccessSpecDecl*>(decl)->getAccess();
+          assert(as != clang::AS_none);
+          continue;
+        }
+        if (llvm::isa<CXXConstructorDecl>(decl)) {
+          if (as == clang::AS_public && !decl->isImplicit()) {
+            candidate_decl = static_cast<CXXConstructorDecl*>(decl);
+            break;
+          }
         }
       }
     }
