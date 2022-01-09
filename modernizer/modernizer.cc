@@ -362,7 +362,6 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
         if (llvm::isa<CXXConstructorDecl>(decl)) {
           if (as == clang::AS_public && !decl->isImplicit()) {
             candidate_decl = static_cast<CXXConstructorDecl*>(decl);
-            break;
           }
         }
       }

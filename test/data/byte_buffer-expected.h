@@ -19,4 +19,25 @@ class ByteBufferWriterT {
   BufferClassT buffer_;
 };
 
+class ByteBufferReader {
+ public:
+  ByteBufferReader(const char* bytes, size_t len);
+
+  // Initializes buffer from a zero-terminated string.
+  explicit ByteBufferReader(const char* bytes);
+
+  ByteBufferReader(const ByteBufferReader&) = delete;
+  ByteBufferReader& operator=(const ByteBufferReader&) = delete;
+
+  bool Consume(size_t size);
+
+ protected:
+  void Construct(const char* bytes, size_t size);
+
+  const char* bytes_;
+  size_t size_;
+  size_t start_;
+  size_t end_;
+};
+
 #endif  // BYTE_BUFFER_H_

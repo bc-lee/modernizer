@@ -17,4 +17,24 @@ class ByteBufferWriterT {
   RTC_DISALLOW_COPY_AND_ASSIGN(ByteBufferWriterT);
 };
 
+class ByteBufferReader {
+ public:
+  ByteBufferReader(const char* bytes, size_t len);
+
+  // Initializes buffer from a zero-terminated string.
+  explicit ByteBufferReader(const char* bytes);
+  bool Consume(size_t size);
+
+ protected:
+  void Construct(const char* bytes, size_t size);
+
+  const char* bytes_;
+  size_t size_;
+  size_t start_;
+  size_t end_;
+
+ private:
+  RTC_DISALLOW_COPY_AND_ASSIGN(ByteBufferReader);
+};
+
 #endif  // BYTE_BUFFER_H_
