@@ -3,7 +3,7 @@ name: C/C++ CI
 on: push
 
 jobs:
-  prepare:
+  build_macos:
     runs-on: [macos, self-hosted]
     steps:
       - name: Checkout depot_tools
@@ -41,3 +41,35 @@ jobs:
           cp webrtc/.gclient modernizer/.gclient
           cd modernizer/src
           gclient sync -v
+
+      - name: Build modernizer
+        run: |
+          cd modernizer/src
+          LLVM_CMAKE_ROOT=$(pwd)/third_party/llvm-project/llvm
+          MODERNIZER_ROOT=$(pwd)
+          mkdir -p cmake-build
+          cd cmake-build
+          cmake "$LLVM_CMAKE_ROOT" \
+            -G Ninja \
+            -DCMAKE_MAKE_PROGRAM=$DEPOT_TOOLS/ninja-mac \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=17 \
+            -DCMAKE_CXX_VISIBILITY_PRESET=hidden
+            -DCMAKE_VISIBILITY_INLINES_HIDDEN=True \
+            -DLLVM_ENABLE_PROJECTS="clang" \
+            -DLLVM_ENABLE_ASSERTIONS=True \
+            -DLLVM_CCACHE_BUILD=True \
+            -DLIBCLANG_BUILD_STATIC=True \
+            -DLLVM_INCLUDE_TESTS=False \
+            -DCLANG_INCLUDE_TESTS=False \
+            -DLLVM_EXTERNAL_PROJECTS=modernizer \
+            -DLLVM_EXTERNAL_MODERNIZER_SOURCE_DIR="$MODERNIZER_ROOT"
+
+          ninja modernizer modernizer_test
+
+      - name: Run unittest for modernizer
+        run: |
+          cd modernizer/src
+          CXX=$(pwd)/third_party/llvm-build/Release+Asserts/bin/clang++
+          test/data/gen_meson.sh
+          cmake-build/bin/modernizer_test
