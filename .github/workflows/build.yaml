@@ -47,12 +47,16 @@ jobs:
           cd modernizer/src
           LLVM_CMAKE_ROOT=$(pwd)/third_party/llvm-project/llvm
           MODERNIZER_ROOT=$(pwd)
+          CC=$(pwd)/third_party/llvm-build/Release+Asserts/bin/clang
+          CXX=$(pwd)/third_party/llvm-build/Release+Asserts/bin/clang++
           mkdir -p cmake-build
           cd cmake-build
           cmake "$LLVM_CMAKE_ROOT" \
             -G Ninja \
             -DCMAKE_MAKE_PROGRAM=$DEPOT_TOOLS/ninja-mac \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=$CC \
+            -DCMAKE_CXX_COMPILER=$CC \
             -DCMAKE_CXX_STANDARD=17 \
             -DCMAKE_CXX_VISIBILITY_PRESET=hidden
             -DCMAKE_VISIBILITY_INLINES_HIDDEN=True \
