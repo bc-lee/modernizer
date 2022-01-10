@@ -26,19 +26,11 @@ target_link_libraries(modernizer
     project_include lib_modernizer absl::flags absl::flags_parse
 )
 
-add_library(test_main OBJECT
-    test_main.cc
-)
-
-target_link_libraries(test_main
-    project_include gtest
-)
-
 add_executable(modernizer_test
     diff_unittest.cc
     path_pattern_unittest.cc
 )
 
 target_link_libraries(modernizer_test
-    project_include lib_modernizer test_main gtest gmock
+    project_include lib_modernizer gtest_main gmock
 )
