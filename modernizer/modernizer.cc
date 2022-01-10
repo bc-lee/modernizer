@@ -414,7 +414,6 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     }
 
     SourceLocation candidate_loc = candidate_decl->getEndLoc();
-    // PrintSourceLocation(candidate_loc, sm, "candidate_loc");
     bool need_next_semi;
     if (candidate_decl->isDefaulted()) {
       need_next_semi = true;
@@ -430,7 +429,6 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
 
     std::optional<SourceLocation> next_semi_loc =
         FindNextSemi(candidate_loc, sm, lang_opts);
-    // PrintSourceLocation(*next_semi_loc, sm, "next_semi_loc");
     return next_semi_loc;
   }
 
@@ -438,14 +436,12 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       SourceLocation loc,
       const SourceManager& sm,
       const LangOptions& lang_opts) {
-    // PrintSourceLocation(loc, sm);
     while (true) {
       llvm::Optional<Token> token = Lexer::findNextToken(loc, sm, lang_opts);
       if (!token) {
         return std::nullopt;
       }
       loc = token->getLocation();
-      // PrintSourceLocation(loc, sm);
       if (token->getKind() == clang::tok::semi) {
         return loc;
       }
@@ -466,53 +462,6 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     }
     return simple_source_loc;
   }
-
-#if 0
-  static void PrintSourceLocation(const SourceLocation& loc,
-                                  const SourceManager& sm,
-                                  std::string_view prefix = "") {
-    if (!loc.isValid()) {
-      llvm::errs() << "Invalid Source Loc\n";
-      return;
-    }
-    SourceLocation spelling_loc = sm.getSpellingLoc(loc);
-    SourceLocation expansion_loc = sm.getExpansionLoc(loc);
-
-    std::string result;
-    llvm::raw_string_ostream result_stream(result);
-
-    if (!prefix.empty()) {
-      result_stream << prefix << " ";
-    }
-    result_stream << "spelling: ";
-    WriteBareSourceLocation(result_stream, spelling_loc, sm, true);
-    result_stream << " expansion: ";
-    WriteBareSourceLocation(result_stream, expansion_loc, sm, false);
-    result_stream << "\n";
-    result_stream.flush();
-    llvm::errs() << result;
-  }
-
-  static llvm::raw_ostream& WriteBareSourceLocation(llvm::raw_ostream& ostream,
-                                                    SourceLocation loc,
-                                                    const SourceManager& sm,
-                                                    bool is_spelling) {
-    PresumedLoc presumed = sm.getPresumedLoc(loc);
-    unsigned actual_line = is_spelling ? sm.getSpellingLineNumber(loc)
-                                       : sm.getExpansionLineNumber(loc);
-    StringRef actual_file = sm.getBufferName(loc);
-    if (!presumed.isValid()) {
-      ostream << "<>";
-      return ostream;
-    }
-
-    ostream << "<file:" << (actual_file.empty() ? "unknown" : actual_file)
-            << ",";
-    ostream << "line:" << actual_line << ",";
-    ostream << "col:" << presumed.getColumn() << ">";
-    return ostream;
-  }
-#endif
 
   const std::filesystem::path root_path_;
   const std::filesystem::path build_path_;
@@ -753,25 +702,6 @@ int RunModernizer(const RunModernizerOptions& options) {
         llvm::errs() << llvm::toString(style.takeError()) << "\n";
         continue;
       }
-
-#if 0
-      std::string dump;
-      llvm::raw_string_ostream dump_stream(dump);
-      dump_stream << "============\n";
-      dump_stream << file_path << "\n";
-      for (const auto& item : file_replacements.second) {
-        dump_stream << llvm::format("  <%d:%d>\n", item.first.line,
-                                    item.first.column);
-        for (const auto& item_replacement : item.second) {
-          dump_stream << llvm::format(
-              "    <%d:%d:%d>\n", item_replacement.getOffset(),
-              item_replacement.getLength(),
-              item_replacement.getReplacementText().size());
-        }
-      }
-      dump_stream.flush();
-      llvm::errs() << dump;
-#endif
 
       Replacements merged_replacements;
       for (auto iter = file_replacements.second.rbegin();
