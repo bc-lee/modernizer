@@ -1,0 +1,41 @@
+name: C/C++ CI
+
+on: [pull_request]
+
+jobs:
+  prepare:
+    runs-on: [macos, self-hosted]
+    steps:
+      - name: Checkout depot_tools
+        run: |
+          if [[ -z "$DEPOT_TOOLS" ]]; then
+            DEPOT_TOOLS=$(pwd)/depot_tools
+            "DEPOT_TOOLS=$DEPOT_TOOLS" >> $GITHUB_ENV
+          fi
+          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_TOOLS" || git -C "$DEPOT_TOOLS" fetch
+      - name: Add PATH for depot_tools
+        run: echo "$DEPOT_TOOLS" >> $GITHUB_PATH
+
+      - name: Checkout WebRTC
+      - run: |
+          mkdir webrtc
+          fetch --nohooks webrtc || true
+          WEBRTC_REVISION="d4c1b92f65568fe6878ed79094fd8ae90c788486"
+          git checkout -f src "$WEBRTC_REVISION"
+
+      - name: Checkout modernizer
+      - uses: actions/checkout@v2
+        with:
+          path: modernizer/src
+          fetch-depth: 0
+          clean: false
+
+      - name: Run gclient sync for WebRTC
+      - run: |
+          cd webrtc/src
+          gclient sync -v
+
+      - name: Run gclient sync for modernizer
+      - run: |
+          cd modernizer/src
+          gclient sync -v
