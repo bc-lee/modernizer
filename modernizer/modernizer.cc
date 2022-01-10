@@ -131,10 +131,12 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
  public:
   explicit ModernizerCallback(const std::filesystem::path& root_path,
                               const std::filesystem::path& build_path,
-                              ReplacementsContext* replacements_context)
+                              ReplacementsContext* replacements_context,
+                              const PathPattern* path_pattern)
       : root_path_(root_path),
         build_path_(build_path),
-        replacements_context_(replacements_context) {
+        replacements_context_(replacements_context),
+        path_pattern_(path_pattern) {
     assert(replacements_context_);
   }
 
@@ -161,16 +163,31 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
     auto pair = std::mismatch(root_path_.begin(), root_path_.end(),
                               file_path.begin(), file_path.end());
     assert(pair.first == root_path_.end());
-    auto rel_file_path = Relative(file_path, build_path_);
-    if (!rel_file_path) {
+    auto rel_file_path_over_buildroot = Relative(file_path, build_path_);
+    if (!rel_file_path_over_buildroot) {
       llvm::errs() << "filesystem::relative failed: "
-                   << rel_file_path.takeError() << "\n";
+                   << rel_file_path_over_buildroot.takeError() << "\n";
       return;
+    }
+    std::string rel_file_path_str = rel_file_path_over_buildroot->string();
+
+    if (path_pattern_) {
+      auto rel_file_path = Relative(file_path, root_path_);
+      if (!rel_file_path) {
+        llvm::errs() << "filesystem::relative failed: "
+                     << rel_file_path.takeError() << "\n";
+        return;
+      }
+      if (!path_pattern_->Match(rel_file_path->string())) {
+        llvm::errs() << "Skip " << rel_file_path->string()
+                     << " because it does not match the source file pattern\n";
+        return;
+      }
     }
 
     auto simple_source_loc = GetSimpleSourceLocation(source_loc);
     assert(simple_source_loc);
-    llvm::errs() << "candidate <file:" << *rel_file_path
+    llvm::errs() << "candidate <file:" << *rel_file_path_over_buildroot
                  << ",line:" << simple_source_loc->line
                  << ",column:" << simple_source_loc->column << ">\n";
 
@@ -235,7 +252,6 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       loc_replacements[*simple_source_loc] = change.getReplacements();
     }
 
-    std::string rel_file_path_str = rel_file_path->string();
     MutexLock guard(*replacements_context_);
     auto& replacements = replacements_context_->GetReplacements();
     auto replacements_iter = replacements.find(rel_file_path_str);
@@ -501,6 +517,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
   const std::filesystem::path root_path_;
   const std::filesystem::path build_path_;
   ReplacementsContext* replacements_context_;
+  const PathPattern* path_pattern_;
 };
 
 class StoredCompilationDatabase : public CompilationDatabase {
@@ -678,7 +695,9 @@ int RunModernizer(const RunModernizerOptions& options) {
                                         getClangStripOutputAdjuster())));
 
   MatchFinder finder;
-  ModernizerCallback callback(project_root, build_root, &replacements_context);
+  ModernizerCallback callback(
+      project_root, build_root, &replacements_context,
+      (source_file_pattern ? &(*source_file_pattern) : nullptr));
 
   finder.addMatcher(
       namedDecl(cxxConstructorDecl(), isExpandedFromMacro(kModernizeMacro))

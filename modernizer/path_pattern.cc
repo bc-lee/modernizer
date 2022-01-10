@@ -64,7 +64,7 @@ std::optional<PathPattern> PathPattern::Create(std::string_view path_patterns) {
   return PathPattern(std::move(compiled_patterns));
 }
 
-bool PathPattern::Match(std::string_view path) {
+bool PathPattern::Match(std::string_view path) const {
   bool result = false;
   std::string converted_path;
   llvm::raw_string_ostream converted_path_stream(converted_path);

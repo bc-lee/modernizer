@@ -20,7 +20,7 @@ class PathPattern {
 
   static std::optional<PathPattern> Create(std::string_view path_patterns);
 
-  bool Match(std::string_view path);
+  bool Match(std::string_view path) const;
 
  private:
   struct PatternElement {
