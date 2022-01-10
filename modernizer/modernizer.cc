@@ -808,6 +808,7 @@ int RunModernizer(const RunModernizerOptions& options) {
       llvm::errs() << "write to file failed\n";
       return 1;
     }
+    return 0;
   }
   for (auto iter = rewrite.buffer_begin(); iter != rewrite.buffer_end();
        ++iter) {
