@@ -665,7 +665,7 @@ int RunModernizer(const RunModernizerOptions& options) {
         }
         if (!source_file_pattern->Match(relative_file_path->string())) {
           llvm::errs()
-              << " Skip " << file_path
+              << "Skip " << *relative_file_path
               << " because it does not match the source file pattern\n";
           continue;
         }
