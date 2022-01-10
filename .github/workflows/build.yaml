@@ -17,7 +17,7 @@ jobs:
         run: echo "$DEPOT_TOOLS" >> $GITHUB_PATH
 
       - name: Checkout WebRTC
-      - run: |
+        run: |
           mkdir webrtc
           fetch --nohooks webrtc || true
           WEBRTC_REVISION="d4c1b92f65568fe6878ed79094fd8ae90c788486"
