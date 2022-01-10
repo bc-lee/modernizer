@@ -1,5 +1,6 @@
 #include <string>
 
+#include "audio_encoder.h"
 #include "byte_buffer.h"
 #include "mutex_lock.h"
 #include "osinfo.h"

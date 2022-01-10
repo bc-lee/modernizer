@@ -113,6 +113,13 @@ class ClassMemberFunctionVisitor
     return true;
   }
 
+  bool VisitVarDecl(VarDecl* decl) {
+    if (depth_ == 1) {
+      inner_decls_.emplace_back(decl);
+    }
+    return true;
+  }
+
   const CXXRecordDecl* record_decl_;
   int depth_ = 0;
   std::vector<Decl*> inner_decls_;
