@@ -18,10 +18,11 @@ jobs:
 
       - name: Checkout WebRTC
         run: |
-          mkdir -p webrtc && cd webrtc
+          mkdir -p webrtc
+          cd webrtc
           fetch --nohooks webrtc || true
           WEBRTC_REVISION="d4c1b92f65568fe6878ed79094fd8ae90c788486"
-          git checkout -C src -f "$WEBRTC_REVISION"
+          git -C src checkout -f "$WEBRTC_REVISION"
 
       - name: Checkout modernizer
         uses: actions/checkout@v2
@@ -37,5 +38,6 @@ jobs:
 
       - name: Run gclient sync for modernizer
         run: |
+          cp webrtc/.gclient modernizer/.gclient
           cd modernizer/src
           gclient sync -v
