@@ -1,6 +1,6 @@
 name: C/C++ CI
 
-on: [pull_request]
+on: push
 
 jobs:
   prepare:
@@ -18,7 +18,7 @@ jobs:
 
       - name: Checkout WebRTC
         run: |
-          mkdir webrtc
+          mkdir -p webrtc && cd webrtc
           fetch --nohooks webrtc || true
           WEBRTC_REVISION="d4c1b92f65568fe6878ed79094fd8ae90c788486"
           git checkout -f src "$WEBRTC_REVISION"
