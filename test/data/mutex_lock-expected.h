@@ -3,8 +3,6 @@
 
 #include <mutex>
 
-#include "rtc_base/constructor_magic.h"
-
 #define SCOPED_LOCKABLE __attribute__((scoped_lockable))
 #define EXCLUSIVE_LOCK_FUNCTION(...) \
   __attribute__((exclusive_lock_function(__VA_ARGS__)))

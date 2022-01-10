@@ -3,8 +3,6 @@
 
 #include <atomic>
 
-#include "rtc_base/constructor_magic.h"
-
 enum class RefCountReleaseStatus { kDroppedLastRef, kOtherRefsRemained };
 
 class RefCountedBase {

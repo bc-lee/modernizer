@@ -1,8 +1,6 @@
 #ifndef AUDIO_ENCODER_H_
 #define AUDIO_ENCODER_H_
 
-#include "rtc_base/constructor_magic.h"
-
 class AudioEncoder {
  public:
   virtual ~AudioEncoder() = default;

@@ -1,8 +1,6 @@
 #ifndef OSINFO_H_
 #define OSINFO_H_
 
-#include "rtc_base/constructor_magic.h"
-
 class OSInfo {
  public:
   static OSInfo* GetInstance();

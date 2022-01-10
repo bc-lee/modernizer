@@ -5,7 +5,6 @@
 #include "mutex_lock.h"
 #include "osinfo.h"
 #include "ref_counted_base.h"
-#include "rtc_base/constructor_magic.h"
 
 namespace {
 

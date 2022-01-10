@@ -32,6 +32,8 @@ namespace {
 constexpr std::string_view kModernizeMacroRegex =
     "(RTC_DISALLOW_COPY_AND_ASSIGN\\(\\s*(\\S(|.*\\S))\\s*\\);)";
 
+constexpr std::string_view kModernizeHeader = "rtc_base/constructor_magic.h";
+
 struct SimpleSourceLocation {
   int line;
   int column;
@@ -757,6 +759,29 @@ int RunModernizer(const RunModernizerOptions& options) {
            iter != file_replacements.second.rend(); ++iter) {
         merged_replacements = merged_replacements.merge(iter->second);
       }
+
+      do {
+        if (!id.isValid()) {
+          break;
+        }
+        Replacements current_replacements;
+
+        llvm::Error err = current_replacements.add(
+            Replacement(file_path, UINT_MAX, 1, kModernizeHeader));
+        if (err) {
+          llvm::errs() << llvm::toString(std::move(err)) << "\n";
+          break;
+        }
+        llvm::Expected<Replacements> header_replacements =
+            clang::format::cleanupAroundReplacements(
+                buffer, current_replacements, *style);
+        if (!header_replacements) {
+          llvm::errs() << llvm::toString(header_replacements.takeError())
+                       << "\n";
+          break;
+        }
+        merged_replacements = merged_replacements.merge(*header_replacements);
+      } while (0);
 
       auto formatted_replacements =
           format::formatReplacements(buffer, merged_replacements, *style);

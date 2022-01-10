@@ -3,8 +3,6 @@
 
 #include <cstddef>
 
-#include "rtc_base/constructor_magic.h"
-
 template <class BufferClassT>
 class ByteBufferWriterT {
  public:
