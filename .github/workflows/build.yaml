@@ -73,7 +73,7 @@ jobs:
           CXX=$(pwd)/third_party/llvm-build/Release+Asserts/bin/clang++
           test/data/gen_meson.sh
           cmake-build/bin/modernizer_test
-          python3 run_test.py
+          python3 run_test.py --program cmake-build/bin/modernizer 
 
       - name: Build WebRTC
         run: |
