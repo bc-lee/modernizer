@@ -11,15 +11,6 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).parent.absolute()
-
-THIRD_PARTY_LIBS = [ROOT / "third_party" / "depot_tools"]
-
-for lib_dir in THIRD_PARTY_LIBS:
-  if f"{lib_dir}" not in sys.path:
-    sys.path.append(f"{lib_dir}")
-
-import subprocess2
-
 TEST_ROOT = ROOT / "test" / "data"
 COMPILE_COMMANDS_JSON = TEST_ROOT / "build" / "compile_commands.json"
 
@@ -56,21 +47,24 @@ def main(argv):
       dest.parent.mkdir(exist_ok=True)
       shutil.copy(src, dest)
 
-    cmd = ["patch", "-p1", "--verbose"]
-    ((stdout, stderr), retcode) = subprocess2.communicate(
+    patch_path = Path(td.name).joinpath("patch.patch")
+    with open(patch_path, "wb") as f:
+      f.write(patch.encode("utf-8"))
+
+    cmd = ["patch", "-p1", f"-i{patch_path}", "--verbose"]
+    r = subprocess.run(
         cmd,
         cwd=td.name,
-        stdin=patch,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True)
-    if retcode != 0:
+    if r.returncode != 0:
       raise RuntimeError(
-          f"Command '{shlex.join(cmd)}' returned non-zero exit status {retcode}."
-          f" stdout:\n{stdout}\nstderr:\n{stderr}")
+          f"Command '{shlex.join(cmd)}' returned non-zero exit status"
+          f" {r.returncode}. stdout:\n{r.stdout}\nstderr:\n{r.stderr}")
 
-    print(f"stout:\n{stdout}")
-    print(f"stderr:\n{stderr}")
+    print(f"stout:\n{r.stdout}")
+    print(f"stderr:\n{r.stderr}")
 
     for test_file in TEST_FILES:
       expected_name, ext = os.path.splitext(test_file)
