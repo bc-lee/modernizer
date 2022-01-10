@@ -318,7 +318,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
         assert(llvm::isa<CXXMethodDecl>(*iter));
         continue;
       }
-      if (maybe_remove) {
+      if (!decl->isImplicit() && maybe_remove) {
         candidate_decl = nullptr;
         maybe_remove = false;
         break;
@@ -725,6 +725,25 @@ int RunModernizer(const RunModernizerOptions& options) {
         llvm::errs() << llvm::toString(style.takeError()) << "\n";
         continue;
       }
+
+#if 0
+      std::string dump;
+      llvm::raw_string_ostream dump_stream(dump);
+      dump_stream << "============\n";
+      dump_stream << file_path << "\n";
+      for (const auto& item : file_replacements.second) {
+        dump_stream << llvm::format("  <%d:%d>\n", item.first.line,
+                                    item.first.column);
+        for (const auto& item_replacement : item.second) {
+          dump_stream << llvm::format(
+              "    <%d:%d:%d>\n", item_replacement.getOffset(),
+              item_replacement.getLength(),
+              item_replacement.getReplacementText().size());
+        }
+      }
+      dump_stream.flush();
+      llvm::errs() << dump;
+#endif
 
       Replacements merged_replacements;
       for (auto iter = file_replacements.second.rbegin();
