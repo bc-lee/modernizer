@@ -43,4 +43,6 @@ TEST(PathPatternTest, Negate2) {
 
   ASSERT_TRUE(pattern->Match("api/array_view.h"));
   ASSERT_FALSE(pattern->Match("third_party/libyuv/include/libyuv.h"));
+  ASSERT_FALSE(
+      pattern->Match("sdk/objc/api/peerconnection/RTCPeerConnection.h"));
 }

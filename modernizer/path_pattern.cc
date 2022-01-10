@@ -36,11 +36,14 @@ std::optional<PathPattern> PathPattern::Create(std::string_view path_patterns) {
     pattern_string_stream << "^";
     if (absolute_path) {
       pattern_string_stream << "/";
+    } else {
+      pattern_string_stream << ".*";
     }
-    pattern_string_stream << ".*";
 
     if (!remainder.empty()) {
       pattern_string_stream << remainder << ".*";
+    } else if (absolute_path) {
+      pattern_string_stream << ".*";
     }
     pattern_string_stream << "$";
     pattern_string_stream.flush();
