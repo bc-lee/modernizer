@@ -31,11 +31,11 @@ jobs:
           clean: false
 
       - name: Run gclient sync for WebRTC
-      - run: |
+        run: |
           cd webrtc/src
           gclient sync -v
 
       - name: Run gclient sync for modernizer
-      - run: |
+        run: |
           cd modernizer/src
           gclient sync -v
