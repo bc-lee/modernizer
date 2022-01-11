@@ -20,7 +20,9 @@ jobs:
         run: |
           mkdir -p webrtc
           cd webrtc
-          fetch --nohooks webrtc || true
+          if [[ ! -f ".gclient" ]]; then
+            fetch --nohooks -f webrtc
+          fi
           WEBRTC_REVISION="d4c1b92f65568fe6878ed79094fd8ae90c788486"
           git -C src checkout -f "$WEBRTC_REVISION"
 
