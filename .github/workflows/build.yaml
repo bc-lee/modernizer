@@ -1,0 +1,93 @@
+name: C/C++ CI
+
+on: push
+
+jobs:
+  build_macos:
+    runs-on: [macos, self-hosted]
+    steps:
+      - name: Checkout depot_tools
+        run: |
+          if [[ -z "$DEPOT_TOOLS" ]]; then
+            DEPOT_TOOLS=$(pwd)/depot_tools
+            "DEPOT_TOOLS=$DEPOT_TOOLS" >> $GITHUB_ENV
+          fi
+          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$DEPOT_TOOLS" || git -C "$DEPOT_TOOLS" fetch
+      - name: Add PATH for depot_tools
+        run: echo "$DEPOT_TOOLS" >> $GITHUB_PATH
+
+      - name: Checkout WebRTC
+        run: |
+          mkdir -p webrtc
+          cd webrtc
+          if [[ ! -f ".gclient" ]]; then
+            fetch --nohooks --force webrtc
+          fi
+          WEBRTC_REVISION="d4c1b92f65568fe6878ed79094fd8ae90c788486"
+          git -C src checkout -f "$WEBRTC_REVISION"
+
+      - name: Checkout modernizer
+        uses: actions/checkout@v2
+        with:
+          path: modernizer/src
+          fetch-depth: 0
+          clean: false
+
+      - name: Run gclient sync for WebRTC
+        run: |
+          cd webrtc/src
+          gclient sync -v
+
+      - name: Run gclient sync for modernizer
+        run: |
+          cp webrtc/.gclient modernizer/.gclient
+          cd modernizer/src
+          gclient sync -v
+
+      - name: Build modernizer
+        run: |
+          cd modernizer/src
+          LLVM_CMAKE_ROOT=$(pwd)/third_party/llvm-project/llvm
+          MODERNIZER_ROOT=$(pwd)
+          mkdir -p cmake-build
+          cd cmake-build
+          cmake "$LLVM_CMAKE_ROOT" \
+            -G Ninja \
+            -DCMAKE_MAKE_PROGRAM=$DEPOT_TOOLS/ninja-mac \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=17 \
+            -DCMAKE_CXX_VISIBILITY_PRESET=hidden \
+            -DCMAKE_VISIBILITY_INLINES_HIDDEN=True \
+            -DLLVM_ENABLE_PROJECTS="clang" \
+            -DLLVM_CCACHE_BUILD=True \
+            -DLIBCLANG_BUILD_STATIC=True \
+            -DLLVM_INCLUDE_TESTS=False \
+            -DCLANG_INCLUDE_TESTS=False \
+            -DLLVM_EXTERNAL_PROJECTS=modernizer \
+            -DLLVM_EXTERNAL_MODERNIZER_SOURCE_DIR="$MODERNIZER_ROOT"
+
+          ninja modernizer modernizer_test
+
+      - name: Run unittest for modernizer
+        run: |
+          cd modernizer/src
+          CXX=$(pwd)/third_party/llvm-build/Release+Asserts/bin/clang++
+          test/data/gen_meson.sh
+          cmake-build/bin/modernizer_test
+          python3 run_test.py --program cmake-build/bin/modernizer 
+
+      - name: Build WebRTC
+        run: |
+          cd webrtc/src
+          gn gen --export-compile-commands --args="is_debug=true target_cpu=\"x64\" cc_wrapper=\"ccache\"" out/Debug
+          ninja -C out/Debug all audio_decoder_unittests common_audio_unittests common_video_unittests dcsctp_unittests low_bandwidth_audio_test modules_tests modules_unittests peerconnection_unittests rtc_media_unittests rtc_pc_unittests rtc_stats_unittests rtc_unittests system_wrappers_unittests test_support_unittests tools_unittests video_capture_tests video_engine_tests voip_unittests webrtc_nonparallel_tests webrtc_perf_tests
+
+      - name: Run modernizer on WebRTC
+        run: |
+          WEBRTC_ROOT=$(pwd)/webrtc/src
+          cd modernizer/src
+          cmake-build/bin/modernizer \
+            --project_root=$WEBRTC_ROOT \
+            --compile_commands=$WEBRTC_ROOT/out/Debug/compile_commands.json \
+            '--source_pattern=/:!third_party' \
+            --in_place=False
