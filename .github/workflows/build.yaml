@@ -87,6 +87,6 @@ jobs:
           cd modernizer/src
           cmake-build/bin/modernizer \
             --project_root=$WEBRTC_ROOT \
-            --compile_commands=$WEBRTC_ROOT/Debug/compile_commands.json \
+            --compile_commands=$WEBRTC_ROOT/out/Debug/compile_commands.json \
             '--source_pattern=/:!third_party' \
             --in_place=False
