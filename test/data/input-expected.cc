@@ -2,6 +2,7 @@
 
 #include "audio_encoder.h"
 #include "byte_buffer.h"
+#include "data_encoding.h"
 #include "mutex_lock.h"
 #include "osinfo.h"
 #include "ref_counted_base.h"

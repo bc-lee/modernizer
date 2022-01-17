@@ -15,8 +15,8 @@ TEST_ROOT = ROOT / "test" / "data"
 COMPILE_COMMANDS_JSON = TEST_ROOT / "build" / "compile_commands.json"
 
 TEST_FILES = [
-    "audio_encoder.h", "byte_buffer.h", "input.cc", "mutex_lock.h", "osinfo.h",
-    "ref_counted_base.h"
+    "audio_encoder.h", "byte_buffer.h", "data_encoding.h", "input.cc",
+    "mutex_lock.h", "osinfo.h", "ref_counted_base.h"
 ]
 
 
