@@ -24,6 +24,7 @@ jobs:
             fetch --nohooks --force webrtc
           fi
           WEBRTC_REVISION="7dd30e04855679a1aca81b1b468eb2ee63531dfe"
+          git -C src fetch
           git -C src checkout -f "$WEBRTC_REVISION"
 
       - name: Checkout modernizer
