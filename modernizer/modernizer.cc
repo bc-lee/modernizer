@@ -361,7 +361,7 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       const SourceManager& sm,
       const LangOptions& lang_opts) {
     AccessSpecifier as = class_access_specifier;
-    CXXMethodDecl* candidate_decl = nullptr;
+    Decl* selected_decl = nullptr;
     for (Decl* decl : all_decls) {
       if (llvm::isa<AccessSpecDecl>(decl)) {
         as = static_cast<AccessSpecDecl*>(decl)->getAccess();
@@ -370,13 +370,13 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
       }
       if (llvm::isa<CXXDestructorDecl>(decl)) {
         if (as == clang::AS_public && !decl->isImplicit()) {
-          candidate_decl = static_cast<CXXDestructorDecl*>(decl);
+          selected_decl = static_cast<CXXDestructorDecl*>(decl);
           break;
         }
       }
     }
 
-    if (candidate_decl == nullptr) {
+    if (selected_decl == nullptr) {
       as = class_access_specifier;
       for (Decl* decl : all_decls) {
         if (llvm::isa<AccessSpecDecl>(decl)) {
@@ -386,13 +386,13 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
         }
         if (llvm::isa<CXXConstructorDecl>(decl)) {
           if (as == clang::AS_public && !decl->isImplicit()) {
-            candidate_decl = static_cast<CXXConstructorDecl*>(decl);
+            selected_decl = static_cast<CXXConstructorDecl*>(decl);
           }
         }
       }
     }
 
-    if (candidate_decl == nullptr) {
+    if (selected_decl == nullptr) {
       as = class_access_specifier;
       for (Decl* decl : all_decls) {
         if (llvm::isa<AccessSpecDecl>(decl)) {
@@ -402,23 +402,50 @@ class ModernizerCallback : public MatchFinder::MatchCallback {
         }
         if (llvm::isa<CXXDestructorDecl>(decl)) {
           if (!decl->isImplicit()) {
-            candidate_decl = static_cast<CXXDestructorDecl*>(decl);
+            selected_decl = static_cast<CXXDestructorDecl*>(decl);
             break;
           }
         }
       }
     }
 
-    if (candidate_decl == nullptr) {
+    if (selected_decl == nullptr) {
+      as = class_access_specifier;
+      Decl* candidate_decl = nullptr;
+      for (Decl* decl : all_decls) {
+        if (llvm::isa<AccessSpecDecl>(decl)) {
+          auto previous_as = as;
+          as = static_cast<AccessSpecDecl*>(decl)->getAccess();
+          assert(as != clang::AS_none);
+          if (previous_as == clang::AS_public && as != previous_as &&
+              candidate_decl) {
+            selected_decl = candidate_decl;
+            break;
+          }
+          continue;
+        }
+        if (as == clang::AS_public) {
+          candidate_decl = decl;
+        }
+      }
+    }
+
+    if (selected_decl == nullptr) {
       return std::nullopt;
     }
 
-    SourceLocation candidate_loc = candidate_decl->getEndLoc();
+    SourceLocation candidate_loc = selected_decl->getEndLoc();
     bool need_next_semi;
-    if (candidate_decl->isDefaulted()) {
-      need_next_semi = true;
-    } else if (candidate_decl->isInlined()) {
-      need_next_semi = false;
+    if (llvm::isa<FunctionDecl>(selected_decl)) {
+      FunctionDecl* selected_function_decl =
+          static_cast<FunctionDecl*>(selected_decl);
+      if (selected_function_decl->isDefaulted()) {
+        need_next_semi = true;
+      } else if (selected_function_decl->isInlined()) {
+        need_next_semi = false;
+      } else {
+        need_next_semi = true;
+      }
     } else {
       need_next_semi = true;
     }
