@@ -23,7 +23,7 @@ jobs:
           if [[ ! -f ".gclient" ]]; then
             fetch --nohooks --force webrtc
           fi
-          WEBRTC_REVISION="d4c1b92f65568fe6878ed79094fd8ae90c788486"
+          WEBRTC_REVISION="7dd30e04855679a1aca81b1b468eb2ee63531dfe"
           git -C src checkout -f "$WEBRTC_REVISION"
 
       - name: Checkout modernizer
